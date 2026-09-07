@@ -27,7 +27,7 @@ export default function AuthCallbackPage() {
       done = true;
       // Única pasada por acá en todo el alta: si la cuenta se creó recién, es
       // un registro nuevo y no un login de alguien que vuelve.
-      captureSignupIfNew(session.user?.created_at);
+      captureSignupIfNew(session.user);
       router.replace(consumePostLoginNext() ?? "/tracker");
     };
 

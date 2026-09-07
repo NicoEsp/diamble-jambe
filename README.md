@@ -205,7 +205,8 @@ NEXT_PUBLIC_POSTHOG_KEY=phc_...   # Project API key, en PostHog → Settings →
 
 `NEXT_PUBLIC_POSTHOG_HOST` es opcional y solo cambia si el proyecto se crea en
 la región EU (`https://eu.i.posthog.com`); el default es US, que es donde está
-Registruti. Sin la key, la analítica es un no-op: no se descarga el script ni
+Registruti. **Si alguna vez cambia la región, hay que actualizar `/privacy`**,
+que declara dónde se procesan los datos. Sin la key, la analítica es un no-op: no se descarga el script ni
 se manda un request, así que en local y en los previews no se ensucian los datos.
 
 ### Eventos
@@ -231,11 +232,16 @@ por MCP crece, hay que sumar `posthog-node` en `src/lib/mcp/tools.ts`.
 
 ### Decisiones que conviene no deshacer sin pensarlo
 
-- **Proxy inverso** (`/ingest` → PostHog, en `next.config.ts`): los eventos
+- **Proxy inverso** (`/ingest` → PostHog, en `src/middleware.ts`): los eventos
   salen por el propio dominio, así que no los cortan los bloqueadores por lista.
-  Obliga a `skipTrailingSlashRedirect: true`, porque varios endpoints de PostHog
-  terminan en barra y la normalización de Next los redirigía antes del rewrite.
-  No duplica URLs indexables: todas las páginas públicas declaran su `canonical`.
+  Va en un middleware y no en los `rewrites` de `next.config.ts` porque un
+  rewrite de config reenvía los headers de la request tal cual: al ser
+  same-origin, el browser adjunta las cookies del dominio y terminarían en un
+  tercero. El middleware saca `Cookie` y `Authorization` antes de mandar, y su
+  `matcher` lo limita a `/ingest/*`. Obliga a `skipTrailingSlashRedirect: true`,
+  porque varios endpoints de PostHog terminan en barra y la normalización de
+  Next los redirigía antes. No duplica URLs indexables: todas las páginas
+  públicas declaran su `canonical`.
 - **Carga diferida**: `posthog-js` pesa ~276 KB y esto vive en el layout raíz.
   Con el `import()` dinámico queda en un chunk aparte que no entra en el camino
   crítico de la landing ni de las páginas de comparación (la landing baja de

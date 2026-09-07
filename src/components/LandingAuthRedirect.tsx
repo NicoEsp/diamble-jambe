@@ -32,7 +32,7 @@ export default function LandingAuthRedirect() {
     const enter = (session: Session) => {
       if (done) return;
       done = true;
-      captureSignupIfNew(session.user?.created_at);
+      captureSignupIfNew(session.user);
       router.replace(consumePostLoginNext() ?? "/tracker");
     };
 

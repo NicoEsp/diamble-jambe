@@ -167,27 +167,73 @@ export function setUserProperties(props: Props): void {
   withPostHog((ph) => ph.setPersonProperties(props));
 }
 
+/** Borra propiedades de la persona (el país cuando se vacía en Ajustes). */
+export function unsetUserProperties(...props: string[]): void {
+  withPostHog((ph) => ph.unsetPersonProperties(props));
+}
+
 /**
  * Corta el vínculo con el usuario al cerrar sesión, para no atribuirle a una
- * cuenta lo que hace la siguiente en el mismo browser. Si PostHog nunca llegó a
- * cargar no hay nada que resetear, y no vale la pena bajarlo para eso.
+ * cuenta lo que hace la siguiente en el mismo browser.
+ *
+ * Si PostHog todavía no cargó no alcanza con no hacer nada: puede haber un
+ * `identify` encolado de la sesión que se acaba de cerrar, y ese callback
+ * correría igual cuando el chunk termine de bajar, identificando al browser ya
+ * deslogueado con la cuenta anterior. Por eso se vacía la cola.
  */
 export function resetAnalytics(): void {
-  client?.reset();
+  if (client) {
+    client.reset();
+  } else {
+    pending.length = 0;
+  }
 }
 
 /** Ventana en la que un ingreso todavía cuenta como alta y no como login. */
 const SIGNUP_WINDOW_MS = 5 * 60 * 1000;
 
+/** Marca de qué cuenta ya se contó el alta, para no contarla dos veces. */
+const SIGNUP_TRACKED_KEY = "registruti_signup_tracked_v1";
+
+/** Respaldo en memoria si localStorage no está disponible (modo privado). */
+let signupTrackedFor: string | null = null;
+
+function signupAlreadyTracked(userId: string): boolean {
+  if (signupTrackedFor === userId) return true;
+  try {
+    return window.localStorage.getItem(SIGNUP_TRACKED_KEY) === userId;
+  } catch {
+    return false;
+  }
+}
+
+function markSignupTracked(userId: string): void {
+  signupTrackedFor = userId;
+  try {
+    window.localStorage.setItem(SIGNUP_TRACKED_KEY, userId);
+  } catch {
+    // Sin localStorage queda solo el respaldo en memoria: alcanza para no
+    // duplicar dentro de la misma carga de página.
+  }
+}
+
 /**
  * Emite `signed_up` si quien vuelve del login es una cuenta recién creada.
  * Se llama al entrar a la app después del OAuth: alguien que vuelve tiene
  * `created_at` viejo y no dispara nada.
+ *
+ * La ventana de 5 minutos sola no alcanza: hay dos puntos de entrada (la
+ * pantalla de callback y la landing, según dónde caiga el token) y recargar
+ * cualquiera de los dos dentro de esos minutos volvería a contar el alta. Con
+ * 21 registros en tres meses, un duplicado no es ruido, es un 5% de error. Así
+ * que además se deja marcado qué cuenta ya se contó.
  */
-export function captureSignupIfNew(createdAt?: string | null): void {
-  if (!createdAt) return;
-  const created = new Date(createdAt).getTime();
+export function captureSignupIfNew(user: { id: string; created_at?: string | null }): void {
+  if (typeof window === "undefined" || !user.id || !user.created_at) return;
+  const created = new Date(user.created_at).getTime();
   if (!Number.isFinite(created)) return;
   if (Date.now() - created > SIGNUP_WINDOW_MS) return;
+  if (signupAlreadyTracked(user.id)) return;
+  markSignupTracked(user.id);
   capture("signed_up");
 }

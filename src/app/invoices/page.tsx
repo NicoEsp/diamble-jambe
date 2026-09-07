@@ -450,13 +450,6 @@ function NewInvoiceModal({
       else setError(invErr?.message ?? "No se pudo crear la factura");
       return;
     }
-    // Sin montos: cuánto factura cada usuario a sus clientes es dato de ellos,
-    // no de la analítica. Con las horas y la moneda alcanza para dimensionar.
-    capture("invoice_created", {
-      currency: client.currency,
-      total_minutes: totalMinutes,
-      entries: preview.length,
-    });
     const { error: updErr } = await supabase
       .from("time_entries")
       .update({ invoice_id: invoice.id })
@@ -469,6 +462,17 @@ function NewInvoiceModal({
       setError(updErr.message);
       return;
     }
+    // Recién acá: si el update de las entradas falla, la pantalla muestra un
+    // error y la factura no queda usable, así que contarla sería inflar el
+    // número que más importa.
+    //
+    // Sin montos: cuánto factura cada usuario a sus clientes es dato de ellos,
+    // no de la analítica. Con las horas y la moneda alcanza para dimensionar.
+    capture("invoice_created", {
+      currency: client.currency,
+      total_minutes: totalMinutes,
+      entries: preview.length,
+    });
     onCreated();
   }
 

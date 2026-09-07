@@ -84,7 +84,16 @@ export default function UpgradeModal({
 
         <a
           href={href ?? "#"}
-          onClick={() => capture("checkout_clicked", { reason })}
+          // `pointer-events-none` frena el mouse pero no el Enter del teclado:
+          // sin esto, activar el CTA antes de que resuelva la URL contaría un
+          // clic al checkout que nunca pasó y navegaría a "#".
+          onClick={(event) => {
+            if (href === null) {
+              event.preventDefault();
+              return;
+            }
+            capture("checkout_clicked", { reason });
+          }}
           aria-disabled={href === null}
           target={external ? "_blank" : undefined}
           rel={external ? "noopener noreferrer" : undefined}

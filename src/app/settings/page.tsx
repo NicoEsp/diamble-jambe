@@ -5,7 +5,7 @@ import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import Modal from "@/components/Modal";
 import UpgradeModal from "@/components/UpgradeModal";
-import { setUserProperties } from "@/lib/analytics";
+import { setUserProperties, unsetUserProperties } from "@/lib/analytics";
 import { supabase } from "@/lib/supabase";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { showToast } from "@/lib/appEvents";
@@ -95,6 +95,7 @@ function Settings() {
     // Los montos de toda la app pasan a formatearse con el locale del país.
     setMoneyLocale(localeFor(country || null));
     if (country) setUserProperties({ country });
+    else unsetUserProperties("country");
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }
