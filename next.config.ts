@@ -12,6 +12,20 @@ const nextConfig: NextConfig = {
   // Para canonicalizar en https://registruti.app (lo que declaran SITE_URL,
   // los canonical y el sitemap): Vercel → Settings → Domains → registruti.app
   // como dominio primario, y www.registruti.app en "Redirect to" hacia él.
+  //
+  // El proxy de `/ingest` hacia PostHog tampoco va acá. Un rewrite de config
+  // reenvía los headers de la request tal cual: al ser same-origin el browser
+  // adjunta las cookies del dominio, y terminan en un tercero (comprobado
+  // contra un servidor de prueba, no es teórico). Vive en `src/middleware.ts`,
+  // que las saca antes de reenviar.
+
+  /**
+   * Varios endpoints de PostHog terminan en barra (`/decide/`, `/e/`), y la
+   * normalización automática de Next los redirige antes de que el middleware
+   * de `/ingest` los vea. Apagarla no duplica URLs indexables: todas las
+   * páginas públicas declaran su `canonical` sin barra final.
+   */
+  skipTrailingSlashRedirect: true,
 };
 
 export default nextConfig;

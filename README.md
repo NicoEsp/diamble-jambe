@@ -191,6 +191,72 @@ gratis/en español" y "control de horas" (long-tail). Estructura:
 Al publicar un post nuevo: entrada en `src/lib/blog.ts` + componente + mapeo del slug.
 El sitemap, el feed y el índice lo levantan solos.
 
+## Analítica (PostHog)
+
+La app manda eventos a [PostHog](https://posthog.com/) para responder tres
+preguntas del embudo: cuánta gente se registra, cuánta llega a cargar horas y
+facturar, y cuánta ve el paywall y hace clic en el checkout.
+
+**Env var en Vercel** (una sola, y es pública):
+
+```
+NEXT_PUBLIC_POSTHOG_KEY=phc_...   # Project API key, en PostHog → Settings → Project
+```
+
+`NEXT_PUBLIC_POSTHOG_HOST` es opcional y solo cambia si el proyecto se crea en
+la región EU (`https://eu.i.posthog.com`); el default es US, que es donde está
+Registruti. **Si alguna vez cambia la región, hay que actualizar `/privacy`**,
+que declara dónde se procesan los datos. Sin la key, la analítica es un no-op: no se descarga el script ni
+se manda un request, así que en local y en los previews no se ensucian los datos.
+
+### Eventos
+
+Están todos tipados en `src/lib/analytics.ts` (`AnalyticsEvent`): si un nombre
+no está en esa unión, no compila.
+
+| Evento | Dónde | Propiedades |
+| --- | --- | --- |
+| `signed_up` | vuelta del OAuth (`/auth/callback` y la landing) | — |
+| `onboarding_completed` | fin del wizard, salteado o no | `last_step`, `created_client` |
+| `time_entry_created` | tracker, registro rápido y repetir entrada | `source`, `duration_minutes`, `billable` |
+| `invoice_created` | alta de factura | `currency`, `total_minutes`, `entries` |
+| `paywall_shown` | se abre `UpgradeModal` | `reason` (`clients` / `invoices` / `general`) |
+| `checkout_clicked` | clic en "Desbloquear lifetime access" | `reason` |
+
+Más `$pageview` por navegación (a mano: con el App Router el automático solo
+contaría la primera vista) y autocapture de clics en links y botones.
+
+Las horas se pueden cargar también por el servidor MCP, y eso **no** genera
+eventos: `log_time` corre server-side y `posthog-js` es del browser. Si el uso
+por MCP crece, hay que sumar `posthog-node` en `src/lib/mcp/tools.ts`.
+
+### Decisiones que conviene no deshacer sin pensarlo
+
+- **Proxy inverso** (`/ingest` → PostHog, en `src/middleware.ts`): los eventos
+  salen por el propio dominio, así que no los cortan los bloqueadores por lista.
+  Va en un middleware y no en los `rewrites` de `next.config.ts` porque un
+  rewrite de config reenvía los headers de la request tal cual: al ser
+  same-origin, el browser adjunta las cookies del dominio y terminarían en un
+  tercero. El middleware saca `Cookie` y `Authorization` antes de mandar, y su
+  `matcher` lo limita a `/ingest/*`. Obliga a `skipTrailingSlashRedirect: true`,
+  porque varios endpoints de PostHog terminan en barra y la normalización de
+  Next los redirigía antes. No duplica URLs indexables: todas las páginas
+  públicas declaran su `canonical`.
+- **Carga diferida**: `posthog-js` pesa ~276 KB y esto vive en el layout raíz.
+  Con el `import()` dinámico queda en un chunk aparte que no entra en el camino
+  crítico de la landing ni de las páginas de comparación (la landing baja de
+  258 kB a 168 kB de First Load JS). Los eventos que ocurren antes de que
+  termine de cargar se encolan.
+- **Nada de datos de los clientes del usuario**: no se mandan nombres de
+  clientes, descripciones de tareas ni montos facturados. `invoice_created`
+  lleva horas y moneda, no plata.
+- **Session replay apagado** (`disable_session_recording`) y **DNT respetado**
+  (`respect_dnt`), que es lo que promete `/privacy`. Con el proxy inverso, DNT
+  es la única salida real que le queda a quien no quiere ser medido.
+- **`person_profiles: "identified_only"`**: las visitas anónimas del marketing
+  generan eventos igual (los embudos funcionan), pero no crean perfiles
+  facturables.
+
 ## Planes y límites
 
 Registruti es **freemium con lifetime access** (pago único, sin suscripción):

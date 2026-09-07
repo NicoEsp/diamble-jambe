@@ -2,8 +2,10 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { consumePostLoginNext } from "@/lib/postLogin";
+import { captureSignupIfNew } from "@/lib/analytics";
 
 /**
  * Red de seguridad para el retorno de OAuth / confirmación de email.
@@ -27,18 +29,19 @@ export default function LandingAuthRedirect() {
     if (!isAuthReturn) return;
 
     let done = false;
-    const enter = () => {
+    const enter = (session: Session) => {
       if (done) return;
       done = true;
+      captureSignupIfNew(session.user);
       router.replace(consumePostLoginNext() ?? "/tracker");
     };
 
     // La sesión puede quedar lista antes o después de suscribirnos.
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) enter();
+      if (data.session) enter(data.session);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) enter();
+      if (session) enter(session);
     });
 
     return () => sub.subscription.unsubscribe();

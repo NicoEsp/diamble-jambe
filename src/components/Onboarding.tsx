@@ -6,6 +6,7 @@ import { CLIENT_COLORS, CURRENCIES } from "@/lib/types";
 import { COUNTRIES, countryFor, localeFor } from "@/lib/countries";
 import { setMoneyLocale } from "@/lib/format";
 import { takeCalculatedRate } from "@/lib/calculatedRate";
+import { capture, setUserProperties } from "@/lib/analytics";
 
 const ONBOARDED_KEY = "registruti_onboarded_v1";
 
@@ -61,6 +62,9 @@ export default function Onboarding() {
   }, [show]);
 
   function finish() {
+    // `step` dice hasta dónde llegó: 3 es el wizard completo, menos es salida
+    // temprana. Es la diferencia entre "el onboarding es largo" y "no engancha".
+    capture("onboarding_completed", { last_step: step, created_client: changed });
     if (typeof window !== "undefined") localStorage.setItem(ONBOARDED_KEY, "1");
     setShow(false);
     if (changed) window.location.reload();
@@ -83,7 +87,10 @@ export default function Onboarding() {
         // La tabla puede no existir todavía (migración sin aplicar): no bloqueamos.
         setNote("No se pudieron guardar los datos de facturación ahora; podés cargarlos luego en Ajustes.");
       } else {
-        if (country) setMoneyLocale(localeFor(country));
+        if (country) {
+          setMoneyLocale(localeFor(country));
+          setUserProperties({ country });
+        }
         setChanged(true);
       }
     }

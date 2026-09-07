@@ -16,6 +16,7 @@ import {
 import { downloadInvoicePdf, type InvoiceIssuer } from "@/lib/invoicePdf";
 import { fetchIssuer } from "@/lib/profile";
 import { FREE_INVOICE_LIMIT, fetchIsPro, isInvoiceLimitError } from "@/lib/plan";
+import { capture } from "@/lib/analytics";
 import type { Client, Invoice, TimeEntry } from "@/lib/types";
 import { formatDuration, formatMoney, formatShortDate, toISODate } from "@/lib/format";
 import { invoiceStatusLabel, invoiceStatusStyle } from "@/lib/invoiceStatus";
@@ -461,6 +462,17 @@ function NewInvoiceModal({
       setError(updErr.message);
       return;
     }
+    // Recién acá: si el update de las entradas falla, la pantalla muestra un
+    // error y la factura no queda usable, así que contarla sería inflar el
+    // número que más importa.
+    //
+    // Sin montos: cuánto factura cada usuario a sus clientes es dato de ellos,
+    // no de la analítica. Con las horas y la moneda alcanza para dimensionar.
+    capture("invoice_created", {
+      currency: client.currency,
+      total_minutes: totalMinutes,
+      entries: preview.length,
+    });
     onCreated();
   }
 

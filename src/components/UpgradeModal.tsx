@@ -9,6 +9,7 @@ import {
   FREE_CLIENT_LIMIT,
   FREE_INVOICE_LIMIT,
 } from "@/lib/plan";
+import { capture } from "@/lib/analytics";
 
 type Reason = "clients" | "invoices" | "general";
 
@@ -50,6 +51,12 @@ export default function UpgradeModal({
   const copy = COPY[reason];
   const [href, setHref] = useState<string | null>(null);
 
+  // El motivo separa "topó clientes" de "topó facturas" y del clic voluntario
+  // desde Ajustes: son tres intenciones distintas y convierten distinto.
+  useEffect(() => {
+    capture("paywall_shown", { reason });
+  }, [reason]);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setHref(buildCheckoutUrl(data.user?.id ?? null, data.user?.email ?? null));
@@ -77,6 +84,16 @@ export default function UpgradeModal({
 
         <a
           href={href ?? "#"}
+          // `pointer-events-none` frena el mouse pero no el Enter del teclado:
+          // sin esto, activar el CTA antes de que resuelva la URL contaría un
+          // clic al checkout que nunca pasó y navegaría a "#".
+          onClick={(event) => {
+            if (href === null) {
+              event.preventDefault();
+              return;
+            }
+            capture("checkout_clicked", { reason });
+          }}
           aria-disabled={href === null}
           target={external ? "_blank" : undefined}
           rel={external ? "noopener noreferrer" : undefined}

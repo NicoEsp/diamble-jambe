@@ -7,6 +7,7 @@ import BillableCheckbox from "@/components/BillableCheckbox";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import DurationInput from "@/components/DurationInput";
 import { supabase } from "@/lib/supabase";
+import { capture } from "@/lib/analytics";
 import { ENTRY_ADDED_EVENT, showToast, useAppEvent } from "@/lib/appEvents";
 import type { Client, TimeEntry } from "@/lib/types";
 import {
@@ -101,6 +102,11 @@ function Tracker() {
       setError(err.message);
       return;
     }
+    capture("time_entry_created", {
+      source: "tracker",
+      duration_minutes: duration,
+      billable,
+    });
     setDescription("");
     loadData();
   }
@@ -129,6 +135,11 @@ function Tracker() {
       setError(err.message);
       return;
     }
+    capture("time_entry_created", {
+      source: "repeat",
+      duration_minutes: entry.duration_minutes,
+      billable: entry.billable,
+    });
     showToast(
       `✓ ${formatDuration(entry.duration_minutes)} registradas hoy a ${
         clientById.get(entry.client_id)?.name ?? "cliente"
