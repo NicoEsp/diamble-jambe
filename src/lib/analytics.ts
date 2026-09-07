@@ -195,22 +195,57 @@ const SIGNUP_WINDOW_MS = 5 * 60 * 1000;
 /** Marca de qué cuenta ya se contó el alta, para no contarla dos veces. */
 const SIGNUP_TRACKED_KEY = "registruti_signup_tracked_v1";
 
-/** Respaldo en memoria si localStorage no está disponible (modo privado). */
-let signupTrackedFor: string | null = null;
+/**
+ * Cuántas cuentas se recuerdan. Guardar una sola no alcanza: si en el mismo
+ * browser se dan de alta dos cuentas seguidas, la segunda pisaría a la primera
+ * y un login de la primera dentro de su ventana volvería a contar el alta.
+ * Pasa en cualquier prueba del flujo y en una máquina compartida.
+ */
+const SIGNUP_TRACKED_MAX = 20;
 
-function signupAlreadyTracked(userId: string): boolean {
-  if (signupTrackedFor === userId) return true;
+/** Respaldo en memoria si localStorage no está disponible (modo privado). */
+const signupTrackedIds = new Set<string>();
+
+function readTrackedSignups(): string[] {
   try {
-    return window.localStorage.getItem(SIGNUP_TRACKED_KEY) === userId;
+    const raw = window.localStorage.getItem(SIGNUP_TRACKED_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((id): id is string => typeof id === "string");
+    return typeof parsed === "string" ? [parsed] : [];
   } catch {
-    return false;
+    // JSON inválido: puede ser el formato viejo, que guardaba el id pelado.
+    try {
+      const raw = window.localStorage.getItem(SIGNUP_TRACKED_KEY);
+      return raw ? [raw] : [];
+    } catch {
+      return [];
+    }
   }
 }
 
+function signupAlreadyTracked(userId: string): boolean {
+  if (signupTrackedIds.has(userId)) return true;
+  return readTrackedSignups().includes(userId);
+}
+
 function markSignupTracked(userId: string): void {
-  signupTrackedFor = userId;
+  signupTrackedIds.add(userId);
+  // El respaldo en memoria se poda con el mismo tope que la lista persistida.
+  // Sin esto crecería sin techo en una pestaña de larga duración, y las dos
+  // memorias del dedupe dirían cosas distintas sobre la misma cuenta.
+  while (signupTrackedIds.size > SIGNUP_TRACKED_MAX) {
+    const masViejo = signupTrackedIds.values().next().value;
+    if (masViejo === undefined) break;
+    signupTrackedIds.delete(masViejo);
+  }
   try {
-    window.localStorage.setItem(SIGNUP_TRACKED_KEY, userId);
+    const ids = readTrackedSignups().filter((id) => id !== userId);
+    ids.push(userId);
+    window.localStorage.setItem(
+      SIGNUP_TRACKED_KEY,
+      JSON.stringify(ids.slice(-SIGNUP_TRACKED_MAX))
+    );
   } catch {
     // Sin localStorage queda solo el respaldo en memoria: alcanza para no
     // duplicar dentro de la misma carga de página.
