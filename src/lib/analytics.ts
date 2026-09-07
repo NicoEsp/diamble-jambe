@@ -231,6 +231,14 @@ function signupAlreadyTracked(userId: string): boolean {
 
 function markSignupTracked(userId: string): void {
   signupTrackedIds.add(userId);
+  // El respaldo en memoria se poda con el mismo tope que la lista persistida.
+  // Sin esto crecería sin techo en una pestaña de larga duración, y las dos
+  // memorias del dedupe dirían cosas distintas sobre la misma cuenta.
+  while (signupTrackedIds.size > SIGNUP_TRACKED_MAX) {
+    const masViejo = signupTrackedIds.values().next().value;
+    if (masViejo === undefined) break;
+    signupTrackedIds.delete(masViejo);
+  }
   try {
     const ids = readTrackedSignups().filter((id) => id !== userId);
     ids.push(userId);
