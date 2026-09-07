@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
 import { formatDuration, toISODate } from "@/lib/format";
 import { emitEntryAdded, showToast } from "@/lib/appEvents";
+import { capture } from "@/lib/analytics";
 
 /**
  * Registro rápido de tiempo, invocable desde cualquier pantalla (atajo T,
@@ -59,6 +60,7 @@ export default function QuickAddEntry({ onClose }: { onClose: () => void }) {
       setError(err.message);
       return;
     }
+    capture("time_entry_created", { source: "quick_add", duration_minutes: duration, billable });
     const clientName = clients?.find((c) => c.id === clientId)?.name ?? "";
     emitEntryAdded();
     showToast(`✓ ${formatDuration(duration)} registradas a ${clientName}`);

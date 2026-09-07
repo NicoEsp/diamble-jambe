@@ -16,6 +16,7 @@ import {
 import { downloadInvoicePdf, type InvoiceIssuer } from "@/lib/invoicePdf";
 import { fetchIssuer } from "@/lib/profile";
 import { FREE_INVOICE_LIMIT, fetchIsPro, isInvoiceLimitError } from "@/lib/plan";
+import { capture } from "@/lib/analytics";
 import type { Client, Invoice, TimeEntry } from "@/lib/types";
 import { formatDuration, formatMoney, formatShortDate, toISODate } from "@/lib/format";
 import { invoiceStatusLabel, invoiceStatusStyle } from "@/lib/invoiceStatus";
@@ -449,6 +450,13 @@ function NewInvoiceModal({
       else setError(invErr?.message ?? "No se pudo crear la factura");
       return;
     }
+    // Sin montos: cuánto factura cada usuario a sus clientes es dato de ellos,
+    // no de la analítica. Con las horas y la moneda alcanza para dimensionar.
+    capture("invoice_created", {
+      currency: client.currency,
+      total_minutes: totalMinutes,
+      entries: preview.length,
+    });
     const { error: updErr } = await supabase
       .from("time_entries")
       .update({ invoice_id: invoice.id })

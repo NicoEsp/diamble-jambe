@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { consumePostLoginNext } from "@/lib/postLogin";
+import { captureSignupIfNew } from "@/lib/analytics";
 import Logo from "@/components/Logo";
 import Wordmark from "@/components/Wordmark";
 
@@ -20,18 +22,21 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     let done = false;
-    const enter = () => {
+    const enter = (session: Session) => {
       if (done) return;
       done = true;
+      // Única pasada por acá en todo el alta: si la cuenta se creó recién, es
+      // un registro nuevo y no un login de alguien que vuelve.
+      captureSignupIfNew(session.user?.created_at);
       router.replace(consumePostLoginNext() ?? "/tracker");
     };
 
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) enter();
+      if (data.session) enter(data.session);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) enter();
+      if (session) enter(session);
     });
 
     // Errores devueltos por el provider (en query o en el hash).
