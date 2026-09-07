@@ -69,9 +69,9 @@ export default function PrivacyPage() {
           Para las estadísticas de uso utilizamos <strong>PostHog</strong>, en su región de
           Estados Unidos. Recibe el identificador de tu cuenta, tu email, la fecha en que la
           creaste, el país que hayas cargado en tu perfil y los eventos descritos en el punto 1. No
-          tenemos activada la grabación de sesiones: nadie mira lo que hacés en pantalla. Si tu
-          navegador envía la señal <em>Do Not Track</em>, no recolectamos nada, y el Servicio
-          funciona igual.
+          tenemos activada la grabación de sesiones: nadie mira lo que hacés en pantalla. Si
+          preferís que dejemos de registrar tu actividad, escribinos y lo damos de baja para tu
+          cuenta.
         </p>
 
         <h2>4. Enlaces públicos de facturas</h2>

@@ -250,9 +250,15 @@ por MCP crece, hay que sumar `posthog-node` en `src/lib/mcp/tools.ts`.
 - **Nada de datos de los clientes del usuario**: no se mandan nombres de
   clientes, descripciones de tareas ni montos facturados. `invoice_created`
   lleva horas y moneda, no plata.
-- **Session replay apagado** (`disable_session_recording`) y **DNT respetado**
-  (`respect_dnt`), que es lo que promete `/privacy`. Con el proxy inverso, DNT
-  es la única salida real que le queda a quien no quiere ser medido.
+- **Session replay apagado** (`disable_session_recording`), que es lo que
+  promete `/privacy`.
+- **`respect_dnt` queda apagado** (su default). No cubre solo Do Not Track: el
+  SDK corta la captura entera si encuentra cualquiera de `doNotTrack`,
+  `msDoNotTrack`, `window.doNotTrack` o **`globalPrivacyControl`**, y ese último
+  lo mandan Brave y DuckDuckGo por defecto. Prenderlo dejaba el panel en cero
+  sin un error ni un aviso, idéntico a "no entró nadie". Si alguna vez se
+  vuelve a prender, hay que actualizar `/privacy` y asumir que una parte del
+  público desaparece de las métricas.
 - **`person_profiles: "identified_only"`**: las visitas anónimas del marketing
   generan eventos igual (los embudos funcionan), pero no crean perfiles
   facturables.
