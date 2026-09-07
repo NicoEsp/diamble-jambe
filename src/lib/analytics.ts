@@ -71,8 +71,25 @@ let loading: Promise<void> | null = null;
 /** Lo que se quiso registrar antes de que estuviera lista, en orden. */
 const pending: Array<(ph: PostHog) => void> = [];
 
+/** Para no repetir el aviso en cada llamada. */
+let avisoKeyFaltante = false;
+
 function load(): void {
-  if (!ANALYTICS_ENABLED || typeof window === "undefined" || loading) return;
+  if (typeof window === "undefined" || loading) return;
+  if (!ANALYTICS_ENABLED) {
+    // Sin este aviso, una key que no entró al build se ve exactamente igual
+    // que "todo bien, pero no entró nadie": cero eventos y cero errores. Son
+    // dos situaciones muy distintas y hay que poder distinguirlas de una.
+    if (!avisoKeyFaltante) {
+      avisoKeyFaltante = true;
+      console.warn(
+        "[analytics] Falta NEXT_PUBLIC_POSTHOG_KEY: no se registra ningún evento. " +
+          "Si esto aparece en producción, la env var no entró al build (se inyecta al compilar, " +
+          "así que hay que redeployar después de cargarla)."
+      );
+    }
+    return;
+  }
   loading = import("posthog-js")
     .then(({ default: posthog }) => {
       posthog.init(POSTHOG_KEY, {
@@ -94,11 +111,15 @@ function load(): void {
         // Si algún día hace falta, que sea una decisión explícita acá y no un
         // switch prendido por error en el panel.
         disable_session_recording: true,
-        // Do Not Track respetado, como promete /privacy. Importa especialmente
-        // acá: los eventos salen por nuestro propio dominio (ver el proxy de
-        // next.config.ts), así que las listas de bloqueo no los frenan y esta
-        // es la única salida real que le queda a quien no quiere ser medido.
-        respect_dnt: true,
+        // `respect_dnt` queda en su default (apagado) a propósito. No cubre
+        // solo Do Not Track: el SDK corta la captura si encuentra CUALQUIERA de
+        // navigator.doNotTrack, navigator.msDoNotTrack, window.doNotTrack o
+        // navigator.globalPrivacyControl. Ese último lo mandan Brave y
+        // DuckDuckGo por defecto, así que prenderlo dejaba en cero a una parte
+        // del público sin un error, un aviso ni nada visible: el panel se ve
+        // igual que si no hubiera entrado nadie. Nos costó una tarde de
+        // diagnóstico. Lo que protege de verdad está en otro lado y sigue en
+        // pie: nada de session replay, ni datos de los clientes del usuario.
         // Autocapture acotado a clics en links y botones: alcanza para ver qué
         // CTA se tocan, sin registrar el tipeo de los formularios.
         autocapture: {
